@@ -51,17 +51,11 @@ def _run_scan_pipeline(url: str, stage: str, deep_features: dict = None) -> Scan
     # ML Pipeline has scaling built in now
     ml_prob = float(ml_pipeline.predict_proba(df_single)[0][1])
     
-    # 5. Fusion (Hybrid: weighted average with rule-floor safety net)
-    # Weighted average prevents ML outliers from dominating.
-    # Rule-floor ensures strong rule signals aren't suppressed by a weak ML score.
+    # 5. Machine Learning Prediction Scoring
+    # Scrapped previous hybrid rule-floor fusion; prediction is directly driven by the trained ML model
     rule_score = rule_res["normalized_score"]
     
-    fused_score = 0.5 * ml_prob + 0.5 * rule_score
-    
-    # Safety net: if rules alone strongly signal phishing, don't let a weak ML
-    # model suppress it below the suspicious threshold
-    if rule_score >= 0.30:
-        fused_score = max(fused_score, rule_score)
+    fused_score = ml_prob
     
     # Override: known malicious domains always get score 1.0
     if features.get("is_known_malicious", False):

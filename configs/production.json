@@ -6,9 +6,9 @@
     "model_type": "xgboost"
   },
   "fusion": {
-    "strategy": "weighted_sum",
-    "ml_weight": 0.6,
-    "rule_weight": 0.4
+    "strategy": "ml_only",
+    "ml_weight": 1.0,
+    "rule_weight": 0.0
   },
   "risk_thresholds": {
     "low_to_suspicious": 0.30,

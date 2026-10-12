@@ -19,6 +19,7 @@ from sklearn.metrics import (
     roc_curve, precision_recall_curve, average_precision_score,
 )
 from xgboost import XGBClassifier
+from lightgbm import LGBMClassifier
 from scipy.stats import randint, uniform
 
 from ml.features.lexical import extract_lexical_features
@@ -140,6 +141,36 @@ print(f"Best CV F1: {xgb_search.best_score_:.4f}")
 print(f"Best params: {json.dumps({k.replace('clf__', ''): (round(v, 4) if isinstance(v, float) else v) for k, v in xgb_search.best_params_.items()}, default=str)}")
 xgb = xgb_search.best_estimator_
 
+# ---------------------------------------------------------------- LightGBM tuning
+print()
+print("=" * 70)
+print(f"5. LIGHTGBM — RandomizedSearchCV ({cv.n_splits}-fold, scoring=F1)")
+print("=" * 70)
+lgb_pipe = Pipeline([
+    ("scaler", StandardScaler()),
+    ("clf", LGBMClassifier(random_state=RANDOM_STATE, n_jobs=2,
+                           class_weight="balanced", verbose=-1)),
+])
+lgb_dist = {
+    "clf__n_estimators": randint(50, 201) if args.quick else randint(100, 501),
+    "clf__max_depth": [-1, 3, 5, 7, 9],
+    "clf__num_leaves": randint(15, 64),
+    "clf__learning_rate": uniform(0.01, 0.29),
+    "clf__subsample": uniform(0.6, 0.4),
+    "clf__colsample_bytree": uniform(0.6, 0.4),
+    "clf__min_child_samples": randint(10, 50),
+    "clf__reg_alpha": uniform(0, 2),
+    "clf__reg_lambda": uniform(0.1, 3),
+}
+lgb_search = RandomizedSearchCV(
+    lgb_pipe, lgb_dist, n_iter=N_ITER, scoring="f1", cv=cv,
+    random_state=RANDOM_STATE, n_jobs=2, verbose=0,
+)
+lgb_search.fit(X_train_sub, y_train_sub)
+print(f"Best CV F1: {lgb_search.best_score_:.4f}")
+print(f"Best params: {json.dumps({k.replace('clf__', ''): (round(v, 4) if isinstance(v, float) else v) for k, v in lgb_search.best_params_.items()}, default=str)}")
+lgb_clf = lgb_search.best_estimator_
+
 # ---------------------------------------------------------------- evaluation
 def full_eval(model, name, X_tr, y_tr, X_te, y_te):
     y_pred_tr = model.predict(X_tr)
@@ -167,33 +198,36 @@ def full_eval(model, name, X_tr, y_tr, X_te, y_te):
 
 print()
 print("=" * 70)
-print(f"5. EVALUATION ON UNTOUCHED TEST SET ({len(X_test)} rows)")
+print(f"6. EVALUATION ON UNTOUCHED TEST SET ({len(X_test)} rows)")
 print("=" * 70)
 rf_m, rf_pred, rf_prob, rf_cm = full_eval(rf, "Random Forest", X_train, y_train, X_test, y_test)
 xgb_m, xgb_pred, xgb_prob, xgb_cm = full_eval(xgb, "XGBoost", X_train, y_train, X_test, y_test)
+lgb_m, lgb_pred, lgb_prob, lgb_cm = full_eval(lgb_clf, "LightGBM", X_train, y_train, X_test, y_test)
 
 # ---------------------------------------------------------------- comparison table
 print()
 print("=" * 70)
-print("6. SIDE-BY-SIDE PERFORMANCE MATRIX")
+print("7. SIDE-BY-SIDE PERFORMANCE MATRIX")
 print("=" * 70)
 metrics_order = ["Accuracy", "Precision", "Recall", "F1-Score", "Specificity",
                  "Sensitivity", "ROC-AUC", "MCC", "PR-AUC"]
-print(f"{'Metric':<14}{'Random Forest':>15}{'XGBoost':>15}")
+print(f"{'Metric':<14}{'Random Forest':>15}{'XGBoost':>15}{'LightGBM':>15}")
 for k in metrics_order:
-    print(f"{k:<14}{rf_m[k]:>15.4f}{xgb_m[k]:>15.4f}")
+    print(f"{k:<14}{rf_m[k]:>15.4f}{xgb_m[k]:>15.4f}{lgb_m[k]:>15.4f}")
 print(f"\nOverfit check (train vs test F1):")
 print(f"  Random Forest: train {rf_m['Train-F1']:.4f} vs test {rf_m['F1-Score']:.4f} "
       f"(gap {rf_m['Train-F1'] - rf_m['F1-Score']:+.4f})")
 print(f"  XGBoost:       train {xgb_m['Train-F1']:.4f} vs test {xgb_m['F1-Score']:.4f} "
       f"(gap {xgb_m['Train-F1'] - xgb_m['F1-Score']:+.4f})")
+print(f"  LightGBM:      train {lgb_m['Train-F1']:.4f} vs test {lgb_m['F1-Score']:.4f} "
+      f"(gap {lgb_m['Train-F1'] - lgb_m['F1-Score']:+.4f})")
 
 # ---------------------------------------------------------------- plots
 sns.set_style("whitegrid")
 
 # confusion matrices
-fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
-for ax, (tn, fp, fn, tp), name in zip(axes, [rf_cm, xgb_cm], ["Random Forest", "XGBoost"]):
+fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
+for ax, (tn, fp, fn, tp), name in zip(axes, [rf_cm, xgb_cm, lgb_cm], ["Random Forest", "XGBoost", "LightGBM"]):
     sns.heatmap(np.array([[tn, fp], [fn, tp]]), annot=True, fmt="d", cmap="Blues",
                 xticklabels=["Pred Legit", "Pred Phish"], yticklabels=["True Legit", "True Phish"],
                 ax=ax, cbar=False)
@@ -205,9 +239,11 @@ plt.close(fig)
 # ROC curves
 fpr_rf, tpr_rf, _ = roc_curve(y_test, rf_prob)
 fpr_xg, tpr_xg, _ = roc_curve(y_test, xgb_prob)
+fpr_lgb, tpr_lgb, _ = roc_curve(y_test, lgb_prob)
 fig, ax = plt.subplots(figsize=(6, 5))
 ax.plot(fpr_rf, tpr_rf, label=f"Random Forest (AUC={rf_m['ROC-AUC']:.4f})")
 ax.plot(fpr_xg, tpr_xg, label=f"XGBoost (AUC={xgb_m['ROC-AUC']:.4f})")
+ax.plot(fpr_lgb, tpr_lgb, label=f"LightGBM (AUC={lgb_m['ROC-AUC']:.4f})")
 ax.plot([0, 1], [0, 1], "k--", lw=0.8, label="Chance")
 ax.set_xlabel("False Positive Rate"); ax.set_ylabel("True Positive Rate")
 ax.set_title("ROC Curves — Test Set"); ax.legend()
@@ -218,9 +254,11 @@ plt.close(fig)
 # PR curves
 prec_rf, rec_rf, _ = precision_recall_curve(y_test, rf_prob)
 prec_xg, rec_xg, _ = precision_recall_curve(y_test, xgb_prob)
+prec_lgb, rec_lgb, _ = precision_recall_curve(y_test, lgb_prob)
 fig, ax = plt.subplots(figsize=(6, 5))
 ax.plot(rec_rf, prec_rf, label=f"Random Forest (AP={rf_m['PR-AUC']:.4f})")
 ax.plot(rec_xg, prec_xg, label=f"XGBoost (AP={xgb_m['PR-AUC']:.4f})")
+ax.plot(rec_lgb, prec_lgb, label=f"LightGBM (AP={lgb_m['PR-AUC']:.4f})")
 ax.axhline(y_test.mean(), color="k", ls="--", lw=0.8, label=f"Baseline ({y_test.mean():.3f})")
 ax.set_xlabel("Recall"); ax.set_ylabel("Precision")
 ax.set_title("Precision-Recall Curves — Test Set"); ax.legend()
@@ -229,19 +267,26 @@ fig.savefig(os.path.join(REPORT_DIR, "pr_curves.png"), dpi=150)
 plt.close(fig)
 
 # feature importances
-fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 rf_imp = pd.Series(rf.named_steps["clf"].feature_importances_, index=FEATURE_SCHEMA).sort_values()
 rf_imp.tail(12).plot.barh(ax=axes[0], color="#2878b5")
 axes[0].set_title("Random Forest — Top Feature Importances (Gini)")
+
 xgb_imp = pd.Series(xgb.named_steps["clf"].feature_importances_, index=FEATURE_SCHEMA).sort_values()
 xgb_imp.tail(12).plot.barh(ax=axes[1], color="#c82423")
 axes[1].set_title("XGBoost — Top Feature Importances (gain)")
+
+lgb_imp = pd.Series(lgb_clf.named_steps["clf"].feature_importances_, index=FEATURE_SCHEMA).sort_values()
+lgb_imp.tail(12).plot.barh(ax=axes[2], color="#2ca02c")
+axes[2].set_title("LightGBM — Top Feature Importances (split)")
+
 fig.tight_layout()
 fig.savefig(os.path.join(REPORT_DIR, "feature_importances.png"), dpi=150)
 plt.close(fig)
 
 print(f"\nTop-5 features (RF):  {list(rf_imp.tail(5).index[::-1])}")
 print(f"Top-5 features (XGB): {list(xgb_imp.tail(5).index[::-1])}")
+print(f"Top-5 features (LGB): {list(lgb_imp.tail(5).index[::-1])}")
 
 # ---------------------------------------------------------------- save artifacts
 results = {
@@ -255,12 +300,14 @@ results = {
     "best_cv_f1_rf": rf_search.best_score_,
     "best_params_xgb": {k.replace("clf__", ""): v for k, v in xgb_search.best_params_.items()},
     "best_cv_f1_xgb": xgb_search.best_score_,
-    "test_metrics": {"Random Forest": rf_m, "XGBoost": xgb_m},
+    "best_params_lgb": {k.replace("clf__", ""): v for k, v in lgb_search.best_params_.items()},
+    "best_cv_f1_lgb": lgb_search.best_score_,
+    "test_metrics": {"Random Forest": rf_m, "XGBoost": xgb_m, "LightGBM": lgb_m},
 }
 with open(os.path.join(REPORT_DIR, "results.json"), "w") as f:
     json.dump(results, f, indent=2, default=str)
 pd.DataFrame({k: {m: round(v[m], 4) for m in metrics_order + ["Train-F1", "Train-Accuracy"]}
-              for k, v in [("Random Forest", rf_m), ("XGBoost", xgb_m)]}).to_csv(
+              for k, v in [("Random Forest", rf_m), ("XGBoost", xgb_m), ("LightGBM", lgb_m)]}).to_csv(
     os.path.join(REPORT_DIR, "metrics_matrix.csv"))
 print(f"\nSaved: {REPORT_DIR}/{{confusion_matrices.png, roc_curves.png, pr_curves.png, feature_importances.png, results.json, metrics_matrix.csv}}")
 print("DONE")

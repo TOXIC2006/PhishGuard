@@ -9,6 +9,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.calibration import CalibratedClassifierCV
 import xgboost as xgb
+import lightgbm as lgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, accuracy_score, confusion_matrix
 from ml.models.registry import get_model_artifact_path
@@ -91,12 +92,14 @@ def main():
     
     rf = RandomForestClassifier(random_state=42, n_estimators=100, class_weight='balanced')
     xg = xgb.XGBClassifier(random_state=42, use_label_encoder=False, eval_metric='logloss', scale_pos_weight=scale_pos)
+    lgb_clf = lgb.LGBMClassifier(random_state=42, class_weight='balanced', verbose=-1)
     lr = LogisticRegression(random_state=42, max_iter=1000, class_weight='balanced')
     
     models = {
         "Logistic Regression": lr,
         "Random Forest": rf,
-        "XGBoost": xg
+        "XGBoost": xg,
+        "LightGBM": lgb_clf
     }
     
     all_metrics = {}

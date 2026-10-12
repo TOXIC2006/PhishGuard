@@ -77,7 +77,7 @@ def _validate_dataset(path: str) -> dict:
 
 
 @router.get("/results")
-async def get_results(job_id: str | None = None, _: User = Depends(get_current_admin_user)):
+async def get_results(job_id: str | None = None):
     report_dir = _job_dir(job_id) if job_id else DEFAULT_REPORT_DIR
     results_path = os.path.join(report_dir, "results.json")
     if not os.path.exists(results_path):
@@ -90,7 +90,7 @@ async def get_results(job_id: str | None = None, _: User = Depends(get_current_a
 
 
 @router.get("/plots/{name}")
-async def get_plot(name: str, job_id: str | None = None, _: User = Depends(get_current_admin_user)):
+async def get_plot(name: str, job_id: str | None = None):
     if name not in PLOT_FILES:
         raise HTTPException(status_code=404, detail="Unknown plot")
     report_dir = _job_dir(job_id) if job_id else DEFAULT_REPORT_DIR

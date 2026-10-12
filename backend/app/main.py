@@ -89,12 +89,16 @@ def model_info():
     if scan_module.rule_engine:
         rule_version = scan_module.rule_engine.config.get("version", "unknown")
     
+    fusion_strategy = "weighted_sum"
+    model_name = "xgboost"
     # Read model version from saved metadata
     try:
         import json
         with open("configs/production.json") as f:
             config = json.load(f)
         
+        model_name = config.get("model", {}).get("model_type", "xgboost")
+        fusion_strategy = config.get("fusion", {}).get("strategy", "weighted_sum")
         latest_path = config["model"]["artifact_path"]
         with open(os.path.join(latest_path, "metadata.json")) as f:
             meta = json.load(f)
@@ -103,9 +107,9 @@ def model_info():
         pass
 
     return {
-        "model_name": "xgboost",
+        "model_name": model_name,
         "model_version": model_version,
         "feature_schema_version": "v1.0",
         "rule_config_version": rule_version,
-        "fusion_strategy": "or_logic"
+        "fusion_strategy": fusion_strategy
     }

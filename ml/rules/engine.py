@@ -52,8 +52,8 @@ class RuleEngine:
             triggered_rules.append(self._build_result("R_SUSPICIOUS_TLD", evidence=f"TLD .{ext.suffix} is high-risk"))
             
         # R_NO_HTTPS
-        # if parsed.scheme == "http":
-        #     triggered_rules.append(self._build_result("R_NO_HTTPS", evidence="Scheme is HTTP"))
+        if parsed.scheme == "http":
+            triggered_rules.append(self._build_result("R_NO_HTTPS", evidence="Scheme is HTTP"))
             
         # R_PUNYCODE
         if features.get("has_punycode"):

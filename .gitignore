@@ -52,6 +52,7 @@ experiments/reports/*
 ml/data/raw/*
 !ml/data/raw/.gitkeep
 
-# Logs
+# Logs & System
 *.log
 *.db
+.DS_Store
