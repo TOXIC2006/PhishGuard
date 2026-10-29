@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type NavRoute = 'home' | 'models' | 'model-detail' | 'compare' | 'live-ops';
+export type NavRoute = 'home' | 'models' | 'model-detail' | 'compare' | 'deep-learning' | 'live-ops';
 
 interface AppShellProps {
   currentRoute: NavRoute;
@@ -55,6 +55,23 @@ export default function AppShell({
       )
     },
     {
+      id: 'deep-learning' as NavRoute,
+      label: 'Deep Learning Lab',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="3" />
+          <circle cx="4" cy="6" r="2" />
+          <circle cx="20" cy="6" r="2" />
+          <circle cx="4" cy="18" r="2" />
+          <circle cx="20" cy="18" r="2" />
+          <line x1="6" y1="7" x2="9.5" y2="10.5" />
+          <line x1="18" y1="7" x2="14.5" y2="10.5" />
+          <line x1="6" y1="17" x2="9.5" y2="13.5" />
+          <line x1="18" y1="17" x2="14.5" y2="13.5" />
+        </svg>
+      )
+    },
+    {
       id: 'live-ops' as NavRoute,
       label: 'Live Operations & Feed',
       icon: (
@@ -71,6 +88,7 @@ export default function AppShell({
       case 'models': return 'Model Directory';
       case 'model-detail': return 'Model Specification';
       case 'compare': return 'Model Comparison Workspace';
+      case 'deep-learning': return 'Deep Learning Lab — CNN & RNN';
       case 'live-ops': return 'Live Threat Operations';
       default: return 'PhishGuard Analytics';
     }
@@ -114,7 +132,7 @@ export default function AppShell({
             </span>
           </div>
           <div style={{ color: 'rgba(243, 248, 247, 0.45)', fontSize: 11 }}>
-            Models: RF, XGBoost, LightGBM
+            Models: RF, XGBoost, LightGBM + Char-CNN, BiLSTM
           </div>
         </div>
       </aside>

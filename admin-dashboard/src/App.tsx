@@ -5,6 +5,7 @@ import HomePage from './components/HomePage';
 import ModelDirectory from './components/ModelDirectory';
 import ModelDetailPage from './components/ModelDetailPage';
 import ComparisonWorkspace from './components/ComparisonWorkspace';
+import DeepLearning from './components/DeepLearning';
 import LiveOperations from './components/LiveOperations';
 import LoginForm from './components/LoginForm';
 
@@ -149,7 +150,7 @@ export default function App() {
         const normalized = normalizeModelId(id);
         setSelectedModelId(normalized);
         setCurrentRoute('model-detail');
-      } else if (['home', 'models', 'compare', 'live-ops'].includes(rawHash)) {
+      } else if (['home', 'models', 'compare', 'deep-learning', 'live-ops'].includes(rawHash)) {
         setCurrentRoute(rawHash as NavRoute);
       }
     };
@@ -267,6 +268,14 @@ export default function App() {
           apiUrl={API_URL}
           token={token}
           onRefreshResults={fetchResults}
+        />
+      )}
+
+      {currentRoute === 'deep-learning' && (
+        <DeepLearning
+          apiUrl={API_URL}
+          token={token}
+          onOpenLogin={() => setShowLoginModal(true)}
         />
       )}
 

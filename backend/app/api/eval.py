@@ -22,6 +22,11 @@ PLOT_FILES = {
     "roc_curves.png",
     "pr_curves.png",
     "feature_importances.png",
+    "training_history.png",
+}
+EVAL_SCRIPTS = {
+    "classic": os.path.join("experiments", "rf_vs_xgb_eval.py"),
+    "dl": os.path.join("experiments", "cnn_rnn_eval.py"),
 }
 MIN_ROWS = 50
 
@@ -123,8 +128,11 @@ async def list_jobs(_: User = Depends(get_current_admin_user)):
 async def start_training(
     file: UploadFile = File(...),
     quick: bool = True,
+    engine: str = "classic",
     _: User = Depends(get_current_admin_user),
 ):
+    if engine not in EVAL_SCRIPTS:
+        raise HTTPException(status_code=400, detail=f"Unknown engine: {engine} (use 'classic' or 'dl')")
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv files are accepted")
 
@@ -148,11 +156,12 @@ async def start_training(
         "created_at": datetime.now().isoformat(),
         "dataset": summary,
         "quick": quick,
+        "engine": engine,
     }
     _write_job(job_id, meta)
 
     cmd = [
-        sys.executable, os.path.join("experiments", "rf_vs_xgb_eval.py"),
+        sys.executable, "-u", EVAL_SCRIPTS[engine],
         "--dataset", dataset_path,
         "--out", job_dir,
     ]
